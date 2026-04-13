@@ -66,10 +66,8 @@ app.get('*', (req, res) => {
 });
 
 // Health check
-// Replace the current /health route with this:
 app.get('/health', (req, res) => {
-    res.set('Content-Type', 'text/plain');
-    res.send('Server is running - ' + new Date().toISOString());
+    res.json({ status: 'running', time: new Date().toISOString() });
 });
 
 app.listen(PORT, () => {
